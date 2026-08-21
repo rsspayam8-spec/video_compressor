@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -33,15 +35,35 @@ class _ProgressScreenState extends State<ProgressScreen> {
       percent: 0, processed: Duration.zero, elapsed: Duration.zero);
   bool _finished = false;
 
+  /// حجم واقعی فایل خروجی که هر چند لحظه خوانده می‌شود — همان چیزی که در
+  /// برنامه‌های مشابه هنگام پردازش، همزمان با درصد نمایش داده می‌شود
+  int _currentBytes = 0;
+  Timer? _sizeTimer;
+
   @override
   void initState() {
     super.initState();
     WakelockPlus.enable();
+    _sizeTimer = Timer.periodic(
+        const Duration(milliseconds: 400), (_) => _checkCurrentSize());
     _run();
+  }
+
+  void _checkCurrentSize() {
+    try {
+      final f = File(widget.outputPath);
+      if (f.existsSync()) {
+        final size = f.lengthSync();
+        if (mounted && size != _currentBytes) {
+          setState(() => _currentBytes = size);
+        }
+      }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
+    _sizeTimer?.cancel();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -57,6 +79,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
     if (!mounted) return;
     _finished = true;
+    _sizeTimer?.cancel();
 
     if (result.cancelled) {
       Navigator.pop(context);
@@ -214,10 +237,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     color: AppColors.tealLight),
               ),
               const SizedBox(height: 2),
+              // حجم زنده فایل خروجی — همزمان با درصد بالا می‌آید
               Text(
-                '${Fmt.duration(_progress.processed)} از ${Fmt.duration(widget.info.duration)}',
+                _currentBytes > 0 ? Fmt.size(_currentBytes) : '—',
                 style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary),
               ),
             ],
           ),
@@ -234,10 +260,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
         children: [
           _stat('زمان سپری‌شده', Fmt.duration(_progress.elapsed)),
           _divider(),
-          _stat('حجم تقریبی', Fmt.size(widget.estimatedBytes)),
+          _stat('حجم فعلی', _currentBytes > 0 ? Fmt.size(_currentBytes) : '—'),
           _divider(),
-          _stat('سرعت',
-              '${Fmt.num_(_progress.speed, decimals: 1)}×'),
+          _stat('سرعت', '${Fmt.num_(_progress.speed, decimals: 1)}×'),
         ],
       ),
     );
