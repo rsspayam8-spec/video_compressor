@@ -2,10 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit_config.dart';
-import 'package:ffmpeg_kit_flutter_new/ffprobe_kit.dart';
-import 'package:ffmpeg_kit_flutter_new/return_code.dart';
+import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new_min/ffprobe_kit.dart';
+import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../core/format.dart';
@@ -132,7 +131,7 @@ class FfmpegService {
     return (v <= 0 || v > 240) ? 30 : v;
   }
 
-  // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
   // تولید تصویر بندانگشتی
   // ---------------------------------------------------------------------
   Future<String?> generateThumbnail(MediaInfo info) async {
@@ -158,20 +157,21 @@ class FfmpegService {
   }
 
   // ---------------------------------------------------------------------
-  // ساخت آرگومان‌های بهینه
+  // ساخت آرگومان‌های FFmpeg
   // ---------------------------------------------------------------------
-  /// نکته کیفیت: از CRF استفاده می‌کنیم نه بیت‌ریت ثابت. CRF کیفیت را ثابت
-  /// نگه می‌دارد و بیت‌ریت را روی صحنه‌های ساده پایین می‌آورد؛ نتیجه: حجم
-  /// کمتر با کیفیت بصری بالاتر نسبت به بیت‌ریت ثابت.
+  /// نکته مهم: به‌جای انکودر نرم‌افزاری x264 (که هم کند است هم حجم برنامه را
+  /// زیاد می‌کند)، از تراشه سخت‌افزاری خود گوشی (Android MediaCodec) استفاده
+  /// می‌کنیم. این هم فشرده‌سازی را چند برابر سریع‌تر می‌کند، هم باتری کمتری
+  /// مصرف می‌کند، و هم دیگر نیازی به بستن ده‌ها مگابایت کتابخانه انکودر در
+  /// خود برنامه نیست. کنترل کیفیت/حجم هم مستقیم با بیت‌ریت انجام می‌شود که
+  /// از نظر پیش‌بینی حجم خروجی، دقیق‌تر از CRF است.
   List<String> buildArguments({
     required MediaInfo info,
     required CompressOptions options,
     required String outputPath,
-    int pass = 0, // 0 = تک‌پاس، 1 و 2 = دوپاس (برای حجم دلخواه)
-    String? passLogFile,
-    int? targetVideoBitrateKbps,
   }) {
     final dims = Dimensions.compute(info, options.effectiveShortSide);
+    final videoKbps = options.effectiveBitrateKbps(info);
     final args = <String>['-y', '-i', info.path];
 
     // --- فیلترها ---
@@ -187,62 +187,28 @@ class FfmpegService {
       args.addAll(['-vf', filters.join(',')]);
     }
 
-    // --- کدک ویدئو ---
-    final isWebm = options.format == OutputFormat.webm;
-    final codecName = isWebm ? 'libvpx-vp9' : options.codec.ffmpegName;
-    args.addAll(['-c:v', codecName]);
-
-    if (isWebm) {
-      args.addAll(['-b:v', '0', '-crf', '${options.effectiveCrf + 6}']);
-      args.addAll(['-row-mt', '1', '-deadline', 'good', '-cpu-used', '2']);
-    } else {
-      args.addAll(['-preset', options.speed.preset]);
-
-      if (targetVideoBitrateKbps != null) {
-        // حالت حجم دلخواه: بیت‌ریت هدف با سقف کنترل‌شده
-        args.addAll([
-          '-b:v', '${targetVideoBitrateKbps}k',
-          '-maxrate', '${(targetVideoBitrateKbps * 1.45).round()}k',
-          '-bufsize', '${(targetVideoBitrateKbps * 2.4).round()}k',
-        ]);
-        if (pass > 0) {
-          args.addAll(['-pass', '$pass']);
-          if (passLogFile != null) args.addAll(['-passlogfile', passLogFile]);
-        }
-      } else {
-        args.addAll(['-crf', '${_crfForCodec(options)}']);
-      }
-
-      // تنظیمات کیفیت/سازگاری
-      if (options.codec == VideoCodec.h265) {
-        args.addAll(['-tag:v', 'hvc1']);
-        args.addAll(['-x265-params', 'log-level=error']);
-      } else {
-        // profile سازگار با گوشی‌های قدیمی
-        args.addAll(['-profile:v', 'high', '-level', '4.1']);
-      }
-      args.addAll(['-pix_fmt', 'yuv420p']);
-      // فاصله کی‌فریم منطقی برای seek روان
-      args.addAll(['-g', '${(info.frameRate * 2).round().clamp(24, 300)}']);
+    // --- کدک ویدئو: انکودر سخت‌افزاری اندروید ---
+    args.addAll(['-c:v', options.codec.ffmpegName]);
+    args.addAll([
+      '-b:v', '${videoKbps}k',
+      '-maxrate', '${(videoKbps * 1.3).round()}k',
+      '-bufsize', '${(videoKbps * 2).round()}k',
+    ]);
+    if (options.codec == VideoCodec.h265) {
+      args.addAll(['-tag:v', 'hvc1']);
     }
+    args.addAll(['-pix_fmt', 'yuv420p']);
+    args.addAll(['-g', '${(info.frameRate * 2).round().clamp(24, 300)}']);
 
-    // --- صدا ---
+    // --- صدا (AAC داخلی — بدون نیاز به کتابخانه خارجی) ---
     if (options.removeAudio || !info.hasAudio) {
       args.add('-an');
-    } else if (pass == 1) {
-      args.add('-an'); // پاس اول نیازی به صدا ندارد
     } else {
-      if (isWebm) {
-        args.addAll(['-c:a', 'libopus', '-b:a', '${options.audioKbps}k']);
-      } else if (options.format == OutputFormat.avi) {
-        args.addAll(['-c:a', 'libmp3lame', '-b:a', '${options.audioKbps}k']);
-      } else {
-        args.addAll([
-          '-c:a', 'aac',
-          '-b:a', '${options.audioKbps}k',
-          '-ac', '2',
-        ]);
-      }
+      args.addAll([
+        '-c:a', 'aac',
+        '-b:a', '${options.audioKbps}k',
+        '-ac', '2',
+      ]);
     }
 
     // --- خروجی ---
@@ -252,26 +218,12 @@ class FfmpegService {
       args.addAll(['-movflags', '+faststart']);
     }
     args.addAll(['-threads', '0']);
-
-    if (pass == 1) {
-      args.addAll(['-f', 'null', Platform.isWindows ? 'NUL' : '/dev/null']);
-    } else {
-      args.add(outputPath);
-    }
+    args.add(outputPath);
     return args;
   }
 
-  /// H.265 در CRF یکسان کیفیت بیشتری می‌دهد؛ برای رسیدن به کیفیت مشابه
-  /// با حجم کمتر، CRF را کمی بالاتر می‌بریم.
-  int _crfForCodec(CompressOptions options) {
-    if (options.codec == VideoCodec.h265) {
-      return (options.effectiveCrf + 4).clamp(18, 40);
-    }
-    return options.effectiveCrf.clamp(16, 40);
-  }
-
   // ---------------------------------------------------------------------
-  // اجرای فشرده‌سازی
+  // اجرای فشرده‌سازی (تک‌مرحله‌ای — چون بیت‌ریت مستقیم حجم را تعیین می‌کند)
   // ---------------------------------------------------------------------
   Future<CompressResult> compress({
     required MediaInfo info,
@@ -282,11 +234,9 @@ class FfmpegService {
     final stopwatch = Stopwatch()..start();
     final totalMs = info.durationSeconds * 1000;
 
-    void emit(int processedMs, {double phaseStart = 0, double phaseWeight = 1}) {
-      final double raw =
-          totalMs <= 0 ? 0.0 : (processedMs / totalMs).clamp(0.0, 1.0).toDouble();
-      final double percent =
-          ((phaseStart + raw * phaseWeight) * 100).clamp(0.0, 99.9).toDouble();
+void emit(int processedMs) {
+      final percent =
+          (totalMs <= 0 ? 0.0 : (processedMs / totalMs * 100)).clamp(0.0, 99.9);
       final elapsed = stopwatch.elapsed;
       Duration? remaining;
       if (percent > 1) {
@@ -307,93 +257,39 @@ class FfmpegService {
     }
 
     try {
-      // حالت حجم دلخواه => دوپاس برای دقت بالا
-      if (options.preset.kind == PresetKind.targetSize &&
-          options.format != OutputFormat.webm) {
-        final tmpDir = await getTemporaryDirectory();
-        final logFile = '${tmpDir.path}/vc_pass_${DateTime.now().millisecondsSinceEpoch}';
-
-        final audioKbps =
-            (options.removeAudio || !info.hasAudio) ? 0 : options.audioKbps;
-        final targetBits = options.targetSizeMb * 1024 * 1024 * 8;
-        var videoKbps =
-            (targetBits / info.durationSeconds / 1000 - audioKbps) * 0.97;
-        videoKbps = videoKbps.clamp(80.0, 40000.0);
-
-        final pass1 = await _run(
-          buildArguments(
-            info: info,
-            options: options,
-            outputPath: outputPath,
-            pass: 1,
-            passLogFile: logFile,
-            targetVideoBitrateKbps: videoKbps.round(),
-          ),
-          (ms) => emit(ms, phaseStart: 0, phaseWeight: 0.35),
-        );
-        if (pass1 == _RunState.cancelled) {
-          return const CompressResult(success: false, cancelled: true);
-        }
-        if (pass1 == _RunState.failed) {
-          return const CompressResult(
-              success: false, errorMessage: 'خطا در مرحله اول پردازش');
-        }
-
-        final pass2 = await _run(
-          buildArguments(
-            info: info,
-            options: options,
-            outputPath: outputPath,
-            pass: 2,
-            passLogFile: logFile,
-            targetVideoBitrateKbps: videoKbps.round(),
-          ),
-          (ms) => emit(ms, phaseStart: 0.35, phaseWeight: 0.65),
-        );
-        _cleanupPassLogs(logFile);
-        return await _finish(pass2, outputPath);
-      }
-
-      // حالت عادی: تک‌پاس CRF
       final state = await _run(
-        buildArguments(
-          info: info,
-          options: options,
-          outputPath: outputPath,
-        ),
-        (ms) => emit(ms),
+        buildArguments(info: info, options: options, outputPath: outputPath),
+        emit,
       );
-      return await _finish(state, outputPath);
+
+      if (state == _RunState.cancelled) {
+        _safeDelete(outputPath);
+        return const CompressResult(success: false, cancelled: true);
+      }
+      if (state == _RunState.failed) {
+        _safeDelete(outputPath);
+        return const CompressResult(
+          success: false,
+          errorMessage:
+              'پردازش ناموفق بود. لطفاً کدک یا بیت‌ریت دیگری را امتحان کنید.',
+        );
+      }
+      final file = File(outputPath);
+      if (!await file.exists()) {
+        return const CompressResult(
+            success: false, errorMessage: 'فایل خروجی ساخته نشد');
+      }
+      return CompressResult(
+        success: true,
+        outputPath: outputPath,
+        outputBytes: await file.length(),
+      );
     } catch (e) {
       return CompressResult(success: false, errorMessage: e.toString());
     } finally {
       stopwatch.stop();
       _activeSessionId = null;
     }
-  }
-
-  Future<CompressResult> _finish(_RunState state, String outputPath) async {
-    if (state == _RunState.cancelled) {
-      _safeDelete(outputPath);
-      return const CompressResult(success: false, cancelled: true);
-    }
-    if (state == _RunState.failed) {
-      _safeDelete(outputPath);
-      return const CompressResult(
-        success: false,
-        errorMessage: 'پردازش ناموفق بود. لطفاً فرمت یا کدک دیگری را امتحان کنید.',
-      );
-    }
-    final file = File(outputPath);
-    if (!await file.exists()) {
-      return const CompressResult(
-          success: false, errorMessage: 'فایل خروجی ساخته نشد');
-    }
-    return CompressResult(
-      success: true,
-      outputPath: outputPath,
-      outputBytes: await file.length(),
-    );
   }
 
   Future<_RunState> _run(
@@ -441,12 +337,6 @@ class FfmpegService {
     } catch (_) {}
   }
 
-  void _cleanupPassLogs(String base) {
-    for (final suffix in ['-0.log', '-0.log.mbtree', '.log', '.log.mbtree']) {
-      _safeDelete('$base$suffix');
-    }
-  }
-
   /// مسیر پوشه خروجی داخل حافظه برنامه
   Future<Directory> outputDirectory() async {
     final base = await getExternalStorageDirectory() ??
@@ -470,10 +360,7 @@ class FfmpegService {
     }
     return candidate;
   }
-
-  Future<void> enableStatistics() async {
-    await FFmpegKitConfig.enableRedirection();
-  }
 }
 
 enum _RunState { success, failed, cancelled }
+
