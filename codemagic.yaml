@@ -50,7 +50,3 @@ workflows:
     artifacts:
       - build/**/outputs/**/*.apk
       - build/**/outputs/**/mapping.txt
-
-    publishing:
-      email:
-        recipients: []   # ایمیل خودتان را اینجا بنویسید تا لینک دانلود برایتان ارسال شود
