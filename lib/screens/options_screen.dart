@@ -25,10 +25,13 @@ class _OptionsScreenState extends State<OptionsScreen> {
   @override
   void initState() {
     super.initState();
+    final suggestedBitrate = widget.info.bitrate > 0
+        ? (widget.info.bitrate / 1000 * 0.6).round().clamp(300, 8000)
+        : 2000;
     _options = CompressOptions(
       preset: CompressPreset.all[1], // پیشنهادی
       customShortSide: widget.info.shortSide,
-      customCrf: 24,
+      customBitrateKbps: suggestedBitrate,
       customFps: widget.info.frameRate,
       targetSizeMb: (widget.info.sizeBytes / 1024 / 1024 / 3)
           .clamp(1, 500)
@@ -101,7 +104,7 @@ class _OptionsScreenState extends State<OptionsScreen> {
           const SizedBox(height: 10),
           const Center(
             child: Text(
-              'پردازش کاملاً روی گوشی انجام می‌شود',
+              'با تراشه سخت‌افزاری گوشی پردازش می‌شود — سریع و کم‌مصرف',
               style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
             ),
           ),
@@ -388,22 +391,21 @@ class _OptionsScreenState extends State<OptionsScreen> {
                     ))
                 .toList(),
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'برای دقت بیشتر، این حالت ویدئو را دو بار تحلیل می‌کند و کمی طولانی‌تر است.',
-            style: TextStyle(
-                fontSize: 11.5, color: AppColors.textSecondary, height: 1.6),
-          ),
         ],
       ),
     );
   }
 
+  /// کنترل بیت‌ریت دستی — هرچه این عدد بیشتر، کیفیت بالاتر ولی حجم هم بیشتر
   Widget _customControls() {
     final resolutions = <int>{240, 360, 480, 540, 720, 1080, 1440, widget.info.shortSide}
         .where((r) => r <= widget.info.shortSide)
         .toList()
       ..sort();
+
+    final bitrate = _options.customBitrateKbps ?? 2000;
+    final previewOptions = _options.copyWith(preset: CompressPreset.all[5]);
+    final estimate = SizeEstimator.estimate(widget.info, previewOptions);
 
     return Padding(
       padding: const EdgeInsets.only(top: 14),
@@ -437,9 +439,9 @@ class _OptionsScreenState extends State<OptionsScreen> {
           const SizedBox(height: 14),
           Row(
             children: [
-              const Text('کیفیت', style: TextStyle(fontSize: 13.5)),
+              const Text('بیت‌ریت ویدئو', style: TextStyle(fontSize: 13.5)),
               const Spacer(),
-              Text(_crfLabel(_options.customCrf ?? 24),
+              Text('${Fmt.fa(bitrate.toString())} kbps',
                   style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.tealLight,
@@ -447,13 +449,47 @@ class _OptionsScreenState extends State<OptionsScreen> {
             ],
           ),
           Slider(
-            value: (_options.customCrf ?? 24).toDouble(),
-            min: 18,
-            max: 34,
-            divisions: 16,
-            onChanged: (v) => setState(
-                () => _options = _options.copyWith(customCrf: v.round())),
+            value: bitrate.toDouble().clamp(200, 20000),
+            min: 200,
+            max: 20000,
+            divisions: 198,
+            onChanged: (v) => setState(() => _options =
+                _options.copyWith(customBitrateKbps: (v / 100).round() * 100)),
           ),
+          Wrap(
+            spacing: 8,
+            children: [500, 1000, 2000, 4000, 8000]
+                .map((v) => ActionChip(
+                      label: Text('${Fmt.fa(v.toString())} kbps',
+                          style: const TextStyle(fontSize: 12)),
+                      backgroundColor: AppColors.surface,
+                      side: const BorderSide(color: AppColors.stroke),
+                      onPressed: () => setState(() =>
+                          _options = _options.copyWith(customBitrateKbps: v)),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.bg,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline_rounded,
+                    size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('حجم تقریبی خروجی: ${Fmt.size(estimate)}',
+                      style: const TextStyle(
+                          fontSize: 12.5, color: AppColors.textSecondary)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
           Row(
             children: [
               const Text('فریم بر ثانیه', style: TextStyle(fontSize: 13.5)),
@@ -467,7 +503,8 @@ class _OptionsScreenState extends State<OptionsScreen> {
           ),
           Slider(
             value: (_options.customFps ?? widget.info.frameRate)
-                .clamp(15, widget.info.frameRate).toDouble(),
+                .clamp(15, widget.info.frameRate)
+                .toDouble(),
             min: 15,
             max: widget.info.frameRate.clamp(16, 120).toDouble(),
             onChanged: (v) =>
@@ -476,14 +513,6 @@ class _OptionsScreenState extends State<OptionsScreen> {
         ],
       ),
     );
-  }
-
-  String _crfLabel(int crf) {
-    if (crf <= 20) return 'خیلی بالا';
-    if (crf <= 24) return 'بالا';
-    if (crf <= 28) return 'متوسط';
-    if (crf <= 31) return 'کم';
-    return 'خیلی کم';
   }
 
   // ------------------------------------------------------------------
@@ -506,19 +535,13 @@ class _OptionsScreenState extends State<OptionsScreen> {
             onTap: _pickFormat,
           ),
           const Divider(height: 1),
-          SettingRow(
-            icon: Icons.speed_rounded,
-            title: 'سرعت پردازش',
-            value: _options.speed.label,
-            onTap: _pickSpeed,
-          ),
-          const Divider(height: 1),
           SwitchListTile(
             value: _options.removeAudio,
             onChanged: widget.info.hasAudio
                 ? (v) => setState(
                     () => _options = _options.copyWith(removeAudio: v))
                 : null,
+            activeThumbColor: AppColors.teal,
             title: const Text('حذف صدا', style: TextStyle(fontSize: 14.5)),
             subtitle: Text(
               widget.info.hasAudio
@@ -576,19 +599,10 @@ class _OptionsScreenState extends State<OptionsScreen> {
         labelOf: (f) => f.label,
         hintOf: (f) => f == OutputFormat.mp4
             ? 'پیشنهادی — سازگار با همه دستگاه‌ها'
-            : f == OutputFormat.webm
-                ? 'مناسب وب، پردازش کندتر'
-                : 'فرمت جایگزین',
+            : f == OutputFormat.mkv
+                ? 'مناسب فایل‌های بزرگ'
+                : 'سازگار با دستگاه‌های اپل',
         onSelect: (f) => setState(() => _options = _options.copyWith(format: f)),
-      );
-
-  Future<void> _pickSpeed() => _showSheet<EncodeSpeed>(
-        title: 'سرعت پردازش',
-        items: EncodeSpeed.values,
-        current: _options.speed,
-        labelOf: (s) => s.label,
-        hintOf: (s) => s.hint,
-        onSelect: (s) => setState(() => _options = _options.copyWith(speed: s)),
       );
 
   Future<void> _showSheet<T>({
