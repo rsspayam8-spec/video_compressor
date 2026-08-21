@@ -1,4 +1,3 @@
-𝐏𝐚𝐲𝐚𝐦 𝐑𝐨𝐬𝐭𝐚𝐦𝐢, [8/21/2026 11:49 PM]
 import 'dart:math' as math;
 
 /// اطلاعات ویدئوی ورودی که با FFprobe خوانده می‌شود
@@ -155,7 +154,6 @@ class CompressOptions {
 
   final String outputName;
 
-𝐏𝐚𝐲𝐚𝐦 𝐑𝐨𝐬𝐭𝐚𝐦𝐢, [8/21/2026 11:49 PM]
 const CompressOptions({
     required this.preset,
     this.codec = VideoCodec.h264,
