@@ -1,3 +1,4 @@
+𝐏𝐚𝐲𝐚𝐦 𝐑𝐨𝐬𝐭𝐚𝐦𝐢, [8/21/2026 11:49 PM]
 import 'dart:math' as math;
 
 /// اطلاعات ویدئوی ورودی که با FFprobe خوانده می‌شود
@@ -35,10 +36,19 @@ class MediaInfo {
   String get resolutionLabel => '$width×$height';
 }
 
-/// کدک ویدئو
+/// کدک ویدئو — هر دو با انکودر سخت‌افزاری MediaCodec خود اندروید کار می‌کنند
+/// (بدون نیاز به کتابخانه نرم‌افزاری x264/x265، حجم برنامه را بسیار کم می‌کند)
 enum VideoCodec {
-  h264('H.264 (x264)', 'سازگاری بالا با همه دستگاه‌ها', 'libx264'),
-  h265('H.265 (HEVC)', 'حجم کمتر تا ۴۰٪، سازگاری کمتر', 'libx265');
+  h264(
+    'H.264 (سخت‌افزاری)',
+    'سریع، کم‌مصرف، سازگار با همه گوشی‌ها',
+    'h264_mediacodec',
+  ),
+  h265(
+    'H.265 / HEVC (سخت‌افزاری)',
+    'حجم کمتر در بیت‌ریت یکسان، نیاز به گوشی نسبتاً جدید',
+    'hevc_mediacodec',
+  );
 
   const VideoCodec(this.label, this.hint, this.ffmpegName);
   final String label;
@@ -46,31 +56,15 @@ enum VideoCodec {
   final String ffmpegName;
 }
 
-/// فرمت خروجی
+/// فرمت خروجی — همه با کدک‌های داخلی (بدون کتابخانه اضافه، حجم نصب کم)
 enum OutputFormat {
   mp4('MP4', 'mp4'),
   mkv('MKV', 'mkv'),
-  mov('MOV', 'mov'),
-  avi('AVI', 'avi'),
-  webm('WEBM', 'webm');
+  mov('MOV', 'mov');
 
   const OutputFormat(this.label, this.ext);
   final String label;
   final String ext;
-}
-
-/// سرعت انکد (تعادل بین سرعت و کیفیت/حجم)
-enum EncodeSpeed {
-  quality('کیفیت بیشتر', 'کندتر، حجم کمتر', 'slow', 1.0),
-  balanced('متعادل', 'پیشنهاد ما', 'medium', 1.06),
-  fast('سریع', 'سریع‌تر، حجم کمی بیشتر', 'faster', 1.15),
-  fastest('خیلی سریع', 'کمترین زمان انتظار', 'veryfast', 1.28);
-
-  const EncodeSpeed(this.label, this.hint, this.preset, this.sizeFactor);
-  final String label;
-  final String hint;
-  final String preset;
-  final double sizeFactor;
 }
 
 /// نوع پریست فشرده‌سازی
@@ -81,8 +75,8 @@ class CompressPreset {
   final PresetKind kind;
   final String title;
   final String subtitle;
-  final int? maxShortSide; // حداکثر ضلع کوچک (مثلاً ۷۲۰) — null یعنی رزولوشن اصلی
-  final int crf; // کیفیت (کمتر = بهتر)
+  final int? maxShortSide; // حداکثر ضلع کوچک — null یعنی رزولوشن اصلی
+  final int baseBitrateKbps; // بیت‌ریت پایه ویدئو
   final int audioBitrateKbps;
 
   const CompressPreset({
@@ -90,7 +84,7 @@ class CompressPreset {
     required this.title,
     required this.subtitle,
     required this.maxShortSide,
-    required this.crf,
+    required this.baseBitrateKbps,
     this.audioBitrateKbps = 128,
   });
 
@@ -98,9 +92,9 @@ class CompressPreset {
     CompressPreset(
       kind: PresetKind.quality,
       title: 'کیفیت اصلی',
-      subtitle: 'رزولوشن دست‌نخورده، کاهش حجم ملایم',
+      subtitle: 'رزولوشن دست‌نخورده، کاهش ملایم حجم',
       maxShortSide: null,
-      crf: 20,
+      baseBitrateKbps: 6000,
       audioBitrateKbps: 160,
     ),
     CompressPreset(
@@ -108,7 +102,7 @@ class CompressPreset {
       title: 'پیشنهادی',
       subtitle: 'بهترین تعادل کیفیت و حجم — برای تلگرام و واتساپ',
       maxShortSide: 720,
-      crf: 24,
+      baseBitrateKbps: 2000,
       audioBitrateKbps: 128,
     ),
     CompressPreset(
@@ -116,7 +110,7 @@ class CompressPreset {
       title: 'حجم کم',
       subtitle: 'کاهش زیاد حجم با کیفیت قابل قبول',
       maxShortSide: 540,
-      crf: 27,
+      baseBitrateKbps: 1200,
       audioBitrateKbps: 96,
     ),
     CompressPreset(
@@ -124,22 +118,22 @@ class CompressPreset {
       title: 'خیلی کم‌حجم',
       subtitle: 'مناسب ارسال سریع در اینترنت ضعیف',
       maxShortSide: 360,
-      crf: 30,
+      baseBitrateKbps: 700,
       audioBitrateKbps: 64,
     ),
     CompressPreset(
       kind: PresetKind.targetSize,
       title: 'حجم دلخواه',
-      subtitle: 'حجم خروجی را خودتان تعیین کنید',
+      subtitle: 'حجم خروجی را خودتان دقیق تعیین کنید',
       maxShortSide: null,
-      crf: 24,
+      baseBitrateKbps: 2000,
     ),
     CompressPreset(
       kind: PresetKind.custom,
       title: 'تنظیمات پیشرفته',
-      subtitle: 'رزولوشن، کیفیت و فریم‌ریت دلخواه',
+      subtitle: 'رزولوشن، بیت‌ریت و فریم‌ریت دلخواه',
       maxShortSide: null,
-      crf: 24,
+      baseBitrateKbps: 2000,
     ),
   ];
 }
@@ -149,7 +143,6 @@ class CompressOptions {
   final CompressPreset preset;
   final VideoCodec codec;
   final OutputFormat format;
-  final EncodeSpeed speed;
   final bool removeAudio;
 
   /// فقط برای حالت «حجم دلخواه» (مگابایت)
@@ -157,20 +150,20 @@ class CompressOptions {
 
   /// فقط برای حالت «تنظیمات پیشرفته»
   final int? customShortSide;
-  final int? customCrf;
+  final int? customBitrateKbps;
   final double? customFps;
 
   final String outputName;
 
-  const CompressOptions({
+𝐏𝐚𝐲𝐚𝐦 𝐑𝐨𝐬𝐭𝐚𝐦𝐢, [8/21/2026 11:49 PM]
+const CompressOptions({
     required this.preset,
     this.codec = VideoCodec.h264,
     this.format = OutputFormat.mp4,
-    this.speed = EncodeSpeed.balanced,
     this.removeAudio = false,
     this.targetSizeMb = 10,
     this.customShortSide,
-    this.customCrf,
+    this.customBitrateKbps,
     this.customFps,
     this.outputName = '',
   });
@@ -179,11 +172,10 @@ class CompressOptions {
     CompressPreset? preset,
     VideoCodec? codec,
     OutputFormat? format,
-    EncodeSpeed? speed,
     bool? removeAudio,
     double? targetSizeMb,
     int? customShortSide,
-    int? customCrf,
+    int? customBitrateKbps,
     double? customFps,
     String? outputName,
   }) {
@@ -191,19 +183,13 @@ class CompressOptions {
       preset: preset ?? this.preset,
       codec: codec ?? this.codec,
       format: format ?? this.format,
-      speed: speed ?? this.speed,
       removeAudio: removeAudio ?? this.removeAudio,
       targetSizeMb: targetSizeMb ?? this.targetSizeMb,
       customShortSide: customShortSide ?? this.customShortSide,
-      customCrf: customCrf ?? this.customCrf,
+      customBitrateKbps: customBitrateKbps ?? this.customBitrateKbps,
       customFps: customFps ?? this.customFps,
       outputName: outputName ?? this.outputName,
     );
-  }
-
-  int get effectiveCrf {
-    if (preset.kind == PresetKind.custom && customCrf != null) return customCrf!;
-    return preset.crf;
   }
 
   int? get effectiveShortSide {
@@ -212,6 +198,28 @@ class CompressOptions {
   }
 
   int get audioKbps => preset.audioBitrateKbps;
+
+  /// بیت‌ریت واقعی ویدئو — این عدد مستقیم به FFmpeg داده می‌شود و مستقیم
+  /// حجم خروجی را تعیین می‌کند (برخلاف CRF که فقط تخمینی بود)
+  int effectiveBitrateKbps(MediaInfo info) {
+    switch (preset.kind) {
+      case PresetKind.quality:
+        final sourceKbps =
+            info.bitrate > 0 ? (info.bitrate / 1000).round() : 6000;
+        return (sourceKbps * 0.85).round().clamp(800, 14000);
+      case PresetKind.recommended:
+      case PresetKind.small:
+      case PresetKind.tiny:
+        return preset.baseBitrateKbps;
+      case PresetKind.targetSize:
+        final audio = removeAudio || !info.hasAudio ? 0 : audioKbps;
+        final totalKbps =
+            (targetSizeMb * 8192) / math.max(info.durationSeconds, 1);
+        return (totalKbps - audio).round().clamp(80, 40000);
+      case PresetKind.custom:
+        return (customBitrateKbps ?? 2000).clamp(80, 40000);
+    }
+  }
 }
 
 /// محاسبه ابعاد خروجی با حفظ نسبت تصویر و زوج بودن اعداد
@@ -237,41 +245,14 @@ class Dimensions {
   String toString() => '$width×$height';
 }
 
-/// تخمین حجم خروجی (تقریبی) برای نمایش به کاربر قبل از شروع
+/// تخمین حجم خروجی — چون مستقیم از بیت‌ریت هدف محاسبه می‌شود، دقیق است
+/// (نه یک حدس آماری مثل حالت CRF قبلی)
 class SizeEstimator {
-  /// بیت بر پیکسل بر اساس CRF — کالیبره‌شده برای x264
-  static double _bitsPerPixel(int crf, VideoCodec codec) {
-    final base = 0.045 * math.pow(2, (28 - crf) / 6.0);
-    final codecFactor = codec == VideoCodec.h265 ? 0.62 : 1.0;
-    return base * codecFactor;
-  }
-
-  /// خروجی: حجم تخمینی به بایت
   static int estimate(MediaInfo info, CompressOptions options) {
-    if (options.preset.kind == PresetKind.targetSize) {
-      return (options.targetSizeMb * 1024 * 1024).round();
-    }
-
-    final dims = Dimensions.compute(info, options.effectiveShortSide);
-    final fps = options.customFps ?? info.frameRate;
-    final effectiveFps = fps <= 0 ? 30.0 : math.min(fps, info.frameRate);
-
-    final bpp = _bitsPerPixel(options.effectiveCrf, options.codec);
-    var videoBps = dims.width * dims.height * effectiveFps * bpp;
-    videoBps *= options.speed.sizeFactor;
-
-    // سقف منطقی: خروجی نباید از بیت‌ریت منبع بیشتر شود
-    if (info.bitrate > 0) {
-      videoBps = math.min(videoBps, info.bitrate * 0.98);
-    }
-
-    final audioBps =
-        options.removeAudio || !info.hasAudio ? 0 : options.audioKbps * 1000;
-
-    final totalBits = (videoBps + audioBps) * info.durationSeconds;
-    final bytes = (totalBits / 8).round();
-
-    // خروجی هرگز نباید بزرگ‌تر از ورودی گزارش شود
-    return math.min(bytes, info.sizeBytes);
+    final videoKbps = options.effectiveBitrateKbps(info);
+    final audioKbps =
+        options.removeAudio || !info.hasAudio ? 0 : options.audioKbps;
+    final totalBits = (videoKbps + audioKbps) * 1000 * info.durationSeconds;
+    return (totalBits / 8).round();
   }
 }
