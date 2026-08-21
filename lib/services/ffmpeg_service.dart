@@ -131,7 +131,7 @@ class FfmpegService {
     return (v <= 0 || v > 240) ? 30 : v;
   }
 
-// ---------------------------------------------------------------------
+  // ---------------------------------------------------------------------
   // تولید تصویر بندانگشتی
   // ---------------------------------------------------------------------
   Future<String?> generateThumbnail(MediaInfo info) async {
@@ -234,7 +234,7 @@ class FfmpegService {
     final stopwatch = Stopwatch()..start();
     final totalMs = info.durationSeconds * 1000;
 
-void emit(int processedMs) {
+    void emit(int processedMs) {
       final percent =
           (totalMs <= 0 ? 0.0 : (processedMs / totalMs * 100)).clamp(0.0, 99.9);
       final elapsed = stopwatch.elapsed;
@@ -363,4 +363,3 @@ void emit(int processedMs) {
 }
 
 enum _RunState { success, failed, cancelled }
-
