@@ -154,7 +154,7 @@ class CompressOptions {
 
   final String outputName;
 
-const CompressOptions({
+  const CompressOptions({
     required this.preset,
     this.codec = VideoCodec.h264,
     this.format = OutputFormat.mp4,
