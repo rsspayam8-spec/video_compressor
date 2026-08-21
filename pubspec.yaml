@@ -1,0 +1,63 @@
+name: video_compressor
+description: "فشرده‌سازی ویدئو - کاهش حجم ویدئو با بالاترین کیفیت، بدون تبلیغات"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # موتور پردازش ویدئو (نسخه full-gpl شامل x264 و x265)
+  ffmpeg_kit_flutter_new: ^4.6.2
+
+  # انتخاب فایل و مسیرها
+  file_picker: ^12.0.0
+  path_provider: ^2.1.6
+
+  # پخش، اشتراک‌گذاری و ذخیره در گالری
+  video_player: ^2.14.0
+  share_plus: ^13.3.0
+  gal: ^2.3.3
+
+  # ابزارها
+  shared_preferences: ^2.5.5
+  wakelock_plus: ^1.7.0
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icon/
+
+  fonts:
+    - family: Vazirmatn
+      fonts:
+        - asset: assets/fonts/Vazirmatn-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Vazirmatn-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Vazirmatn-Bold.ttf
+          weight: 700
+
+# تنظیمات ساخت آیکون: flutter pub run flutter_launcher_icons
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 24
+  adaptive_icon_background: "#0DB0B0"
+  adaptive_icon_foreground: "assets/icon/adaptive_foreground.png"
+  remove_alpha_ios: true

@@ -1,0 +1,8 @@
+# این فایل را به key.properties تغییر نام دهید و مقادیر واقعی را بنویسید
+# ⚠️ این فایل و فایل .jks را هرگز در گیت‌هاب یا جای عمومی قرار ندهید
+# ⚠️ اگر این کلید را گم کنید، دیگر نمی‌توانید برای همین برنامه به‌روزرسانی منتشر کنید
+
+storePassword=رمز_انبار_کلید
+keyPassword=رمز_کلید
+keyAlias=videocompressor
+storeFile=C:/keys/videocompressor.jks

@@ -1,0 +1,21 @@
+﻿# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Android
+android/.gradle/
+android/local.properties
+
+# SECRETS - never commit these
+android/key.properties
+*.jks
+*.keystore
