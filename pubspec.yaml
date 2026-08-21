@@ -17,7 +17,7 @@ dependencies:
   ffmpeg_kit_flutter_new: ^4.6.2
 
   # انتخاب فایل و مسیرها
-  file_picker: 8.1.2
+  file_picker: ^12.0.0
   path_provider: ^2.1.6
 
   # پخش، اشتراک‌گذاری و ذخیره در گالری
