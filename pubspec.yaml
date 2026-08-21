@@ -14,7 +14,7 @@ dependencies:
     sdk: flutter
 
   # موتور پردازش ویدئو (نسخه full-gpl شامل x264 و x265)
-  ffmpeg_kit_flutter_new_min: ^4.4.0
+  ffmpeg_kit_flutter_new_min: ^3.6.2
 
   # انتخاب فایل و مسیرها
   file_picker: ^12.0.0
