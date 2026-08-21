@@ -24,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_loading) return;
     setState(() => _loading = true);
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.video,
         allowMultiple: false,
       );
