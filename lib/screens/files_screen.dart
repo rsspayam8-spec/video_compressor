@@ -58,7 +58,8 @@ class _FilesScreenState extends State<FilesScreen> {
                   style: TextStyle(fontSize: 14.5)),
               onTap: () async {
                 Navigator.pop(context);
-                await Share.shareXFiles([XFile(file.path)]);
+                await SharePlus.instance
+                    .share(ShareParams(files: [XFile(file.path)]));
               },
             ),
             ListTile(
