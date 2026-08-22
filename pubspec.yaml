@@ -16,7 +16,7 @@ dependencies:
   # موتور پردازش: نسخه min-gpl = هسته کوچک FFmpeg + کدک‌های x264/x265
   # (کنترل دقیق بیت‌ریت و بهترین نسبت کیفیت به حجم، با حجمی به‌مراتب
   # کمتر از بسته full-gpl که ۲۲۰ مگابایت می‌شد)
-  ffmpeg_kit_flutter_new_min_gpl: ^3.6.2
+  ffmpeg_kit_flutter_new_min_gpl: ^2.6.2
 
   # انتخاب فایل و مسیرها
   file_picker: ^8.1.2
