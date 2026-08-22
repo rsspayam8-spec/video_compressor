@@ -5,9 +5,7 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       android_signing:
-        - video_compressor_keystore   # باید دقیقاً همین اسم را در Codemagic بدهید
-      vars:
-        PACKAGE_NAME: "ir.videotools.compressor"
+        - video_compressor_keystore
       flutter: stable
 
     scripts:
@@ -17,19 +15,18 @@ workflows:
       - name: Generate launcher icons
         script: dart run flutter_launcher_icons || true
 
-      # نسخه NDK را با نسخه‌ای که روی سرور Codemagic نصب است هماهنگ می‌کند
       - name: Match NDK version
         script: |
           NDK_DIR="$ANDROID_SDK_ROOT/ndk"
           if [ -d "$NDK_DIR" ]; then
             LATEST_NDK=$(ls "$NDK_DIR" | sort -V | tail -n 1)
             if [ -n "$LATEST_NDK" ]; then
+              sed -i "" "s/ndkVersion = \".*\"/ndkVersion = \"$LATEST_NDK\"/" android/app/build.gradle.kts || \
               sed -i "s/ndkVersion = \".*\"/ndkVersion = \"$LATEST_NDK\"/" android/app/build.gradle.kts
               echo "Using NDK: $LATEST_NDK"
             fi
           fi
 
-      # ساخت فایل key.properties از مقادیر امن Codemagic
       - name: Set up key.properties
         script: |
           cat > "$CM_BUILD_DIR/android/key.properties" <<EOF
@@ -39,15 +36,20 @@ workflows:
           storeFile=$CM_KEYSTORE_PATH
           EOF
 
-      # پکیج FFmpeg بار اول یک فایل aar دانلود می‌کند و ممکن است شکست بخورد؛
-      # بار دوم مطمئناً موفق می‌شود. این رفتار شناخته‌شده خود پکیج است.
-      - name: Build APK (attempt 1 - may fail, downloads FFmpeg aar)
-        script: flutter build apk --release || true
+      # ساخت APK جداگانه برای هر معماری — حجم هر فایل تقریباً نصف
+      # نسخه universal می‌شود. برای مایکت فایل arm64-v8a را آپلود کنید.
+      - name: Build APK (attempt 1 - downloads FFmpeg aar)
+        script: flutter build apk --release --split-per-abi || true
 
       - name: Build APK (final)
-        script: flutter build apk --release
+        script: flutter build apk --release --split-per-abi
+
+      - name: Report APK sizes
+        script: |
+          echo "================ APK SIZES ================"
+          ls -lh build/app/outputs/flutter-apk/*.apk
+          echo "=========================================="
 
     artifacts:
       - build/**/outputs/**/*.apk
       - build/**/outputs/**/mapping.txt
-
