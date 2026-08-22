@@ -24,11 +24,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_loading) return;
     setState(() => _loading = true);
     try {
-      final files = await FilePicker.pickFiles(
+      final result = await FilePicker.platform.pickFiles(
         type: FileType.video,
         allowMultiple: false,
       );
-      final path = files.isEmpty ? null : files.first.path;
+      final path = result?.files.single.path;
       if (path == null) return;
 
       final info = await FfmpegService.instance.probe(path);
