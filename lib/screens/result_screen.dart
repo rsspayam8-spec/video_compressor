@@ -54,7 +54,9 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   Future<void> _share() async {
-    await Share.shareXFiles([XFile(widget.outputPath)]);
+    await SharePlus.instance.share(
+      ShareParams(files: [XFile(widget.outputPath)]),
+    );
   }
 
   Future<void> _delete() async {
