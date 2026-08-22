@@ -13,22 +13,22 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  # موتور پردازش ویدئو (نسخه full-gpl شامل x264 و x265)
-  ffmpeg_kit_flutter_new_min: ^3.6.2
+  # موتور پردازش: نسخه min-gpl = هسته کوچک FFmpeg + کدک‌های x264/x265
+  # (کنترل دقیق بیت‌ریت و بهترین نسبت کیفیت به حجم، با حجمی به‌مراتب
+  # کمتر از بسته full-gpl که ۲۲۰ مگابایت می‌شد)
+  ffmpeg_kit_flutter_new_min_gpl: ^3.6.2
 
   # انتخاب فایل و مسیرها
-  file_picker: ^12.0.0
-  path_provider: ^2.1.6
+  file_picker: ^8.1.2
+  path_provider: ^2.1.4
 
   # پخش، اشتراک‌گذاری و ذخیره در گالری
-  video_player: ^2.14.0
-  share_plus: ^13.3.0
-  gal: ^2.3.3
+  video_player: ^2.9.2
+  share_plus: ^10.1.2
+  gal: ^2.3.0
 
   # ابزارها
-  shared_preferences: ^2.5.5
-  wakelock_plus: ^1.7.0
-  intl: ^0.20.2
+  wakelock_plus: ^1.2.8
 
 dev_dependencies:
   flutter_test:
